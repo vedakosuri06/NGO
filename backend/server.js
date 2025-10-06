@@ -147,3 +147,45 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+// ...existing code...
+
+/* ----------------------------
+   LOGIN
+---------------------------- */
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+  // Replace with your actual user table and password check
+  db.query(
+    "SELECT * FROM users WHERE email = ? AND password = ?",
+    [email, password],
+    (err, results) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (results.length > 0) {
+        res.json({ message: "Login successful", user: results[0] });
+      } else {
+        res.status(401).json({ error: "Invalid email or password" });
+      }
+    }
+  );
+});
+// ...existing code...
+// ...existing code...
+app.post("/register", (req, res) => {
+  const { email, password } = req.body;
+  // For production, hash the password!
+  db.query(
+    "INSERT INTO users (email, password) VALUES (?, ?)",
+    [email, password],
+    (err, result) => {
+      if (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.status(400).json({ error: "Email already exists" });
+        }
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ message: "Registration successful" });
+    }
+  );
+});
+// ...existing code...
