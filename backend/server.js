@@ -148,6 +148,106 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
+/* ----------------------------
+   CAMPAIGNS (for Progress Bars)
+---------------------------- */
+app.get("/campaigns", (req, res) => {
+  db.query("SELECT * FROM campaigns ORDER BY id DESC", (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(results);
+  });
+});
+
+app.post("/campaigns", (req, res) => {
+  const { name, goal, raised, donors, days_left } = req.body;
+  db.query(
+    "INSERT INTO campaigns (name, goal, raised, donors, days_left) VALUES (?, ?, ?, ?, ?)",
+    [name, goal, raised, donors, days_left],
+    (err, results) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: "✅ Campaign added", campaignId: results.insertId });
+    }
+  );
+});
+
+/* ----------------------------
+   ACTIVITY FEED (Recent Activities)
+---------------------------- */
+app.get("/activities/recent", (req, res) => {
+  const limit = req.query.limit || 8;
+  
+  // Get recent donations
+  const donationsQuery = `
+    SELECT 
+      'donation' as type,
+      donors.name as name,
+      donations.amount,
+      donations.campaign,
+      donations.created_at as time
+    FROM donations
+    LEFT JOIN donors ON donations.donor_id = donors.id
+    ORDER BY donations.created_at DESC
+    LIMIT ?
+  `;
+  
+  // Get recent volunteers
+  const volunteersQuery = `
+    SELECT 
+      'volunteer' as type,
+      name,
+      program,
+      created_at as time
+    FROM volunteers
+    ORDER BY created_at DESC
+    LIMIT ?
+  `;
+  
+  // Get recent milestones
+  const milestonesQuery = `
+    SELECT 
+      'milestone' as type,
+      message,
+      program,
+      created_at as time
+    FROM milestones
+    ORDER BY created_at DESC
+    LIMIT ?
+  `;
+  
+  // Execute all queries
+  Promise.all([
+    new Promise((resolve, reject) => {
+      db.query(donationsQuery, [limit], (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db.query(volunteersQuery, [limit], (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    }),
+    new Promise((resolve, reject) => {
+      db.query(milestonesQuery, [limit], (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    })
+  ])
+  .then(([donations, volunteers, milestones]) => {
+    // Combine and sort by time
+    const activities = [...donations, ...volunteers, ...milestones]
+      .sort((a, b) => new Date(b.time) - new Date(a.time))
+      .slice(0, limit);
+    
+    res.json(activities);
+  })
+  .catch(err => {
+    res.status(500).json({ error: err.message });
+  });
+});
+
 // ...existing code...
 
 /* ----------------------------
